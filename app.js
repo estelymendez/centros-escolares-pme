@@ -287,9 +287,7 @@ function uniqueSorted(schools, fieldKey) {
 
 function populateFilterOptions(schools) {
   fillSelect(els.filterDepto, uniqueSorted(schools, "NOMBRE DEPTO"), "Todos los departamentos");
-  fillSelect(els.filterMunicipio, uniqueSorted(schools, "MUNICIPIO"), "Todos los municipios");
   fillSelect(els.filterDistrito, getDistritosForDepto(schools, ""), "Todos los distritos");
-  fillSelect(els.filterZona, uniqueSorted(schools, "ZONA (2)"), "Toda zona");
   fillSelect(els.filterRegion, uniqueSorted(schools, "ZONA"), "Toda región");
   fillSelect(els.filterGrupo, uniqueSorted(schools, "GRUPO (BLOQUE)"), "Todo grupo");
 }
@@ -325,17 +323,13 @@ function fillSelect(selectEl, values, placeholder) {
 function applyFilters() {
   const q = els.searchInput.value.trim().toLowerCase();
   const depto = els.filterDepto.value;
-  const municipio = els.filterMunicipio.value;
   const distrito = els.filterDistrito.value;
-  const zona = els.filterZona.value;
   const region = els.filterRegion.value;
   const grupo = els.filterGrupo.value;
 
   filteredSchools = allSchools.filter((s) => {
     if (depto && s.fields["NOMBRE DEPTO"] !== depto) return false;
-    if (municipio && s.fields["MUNICIPIO"] !== municipio) return false;
     if (distrito && s.fields["NOMBRE DISTRITO"] !== distrito) return false;
-    if (zona && s.fields["ZONA (2)"] !== zona) return false;
     if (region && s.fields["ZONA"] !== region) return false;
     if (grupo && s.fields["GRUPO (BLOQUE)"] !== grupo) return false;
     if (q) {
@@ -512,8 +506,6 @@ function wireEvents() {
     applyFilters();
   });
 
-  els.filterMunicipio.addEventListener("change", applyFilters);
-  els.filterZona.addEventListener("change", applyFilters);
   els.filterRegion.addEventListener("change", applyFilters);
   els.filterGrupo.addEventListener("change", applyFilters);
   els.closeDetail.addEventListener("click", () => els.detailPanel.classList.add("hidden"));
