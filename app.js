@@ -44,7 +44,7 @@ const FIELD_LABELS = {
   "SUBVENCIONADA": "Subvencionada",
   "SECTOR": "Sector",
   "ZONA": "Región",
-  "ZONA (2)": "Zona (urbana/rural)",
+  "ZONA (2)": "Zona",
   "TURNO": "Turno",
   "MODALIDAD": "Modalidad",
   "SECCIONES": "Secciones",
@@ -60,8 +60,9 @@ const FIELD_LABELS = {
   "INAUGURACIONES": "Inauguraciones",
   "ESCALADA": "Escalada",
   "FASE": "Fase",
-  "GRUPO (BLOQUE)": "Grupo (bloque)",
+  "GRUPO (BLOQUE)": "Grupo",
   "GRUPO2": "Grupo 2",
+   "COORDENADAS": "Coordenadas",
 };
 
 // Orden preferido de despliegue en el panel de detalle.
@@ -87,7 +88,8 @@ const SEARCH_FIELDS = ["NOMBRE CE", "CÓD CE", "DIRECCION", "MUNICIPIO", "NOMBRE
 // const HIDDEN_FIELDS = ["CÓDIGO DISTRITO"];
 const HIDDEN_FIELDS = ["CÓD CE (2)", "mat 2026", "TIPO DE SEDE", "DESCRIPCION TIPO",
                       "ESCALADA", "CÓDIGO DEPTO", "CÓDIGO DISTRITO", "ARK", "CAF",
-                       "EVALUACION", "CAF intervenc", "LXP", "KIRA", "CHK"
+                       "EVALUACION", "CAF intervenc", "LXP", "KIRA", "CHK", "XAI", "chk", 
+                       "MOVISTAR", "STARLINK"
                       ];
 
 // --- Estado global ---------------------------------------------
