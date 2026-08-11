@@ -87,7 +87,7 @@ const SEARCH_FIELDS = ["NOMBRE CE", "CÓD CE", "DIRECCION", "MUNICIPIO", "NOMBRE
 // const HIDDEN_FIELDS = ["CÓDIGO DISTRITO"];
 const HIDDEN_FIELDS = ["CÓD CE (2)", "mat 2026", "TIPO DE SEDE", "DESCRIPCION TIPO",
                       "ESCALADA", "CÓDIGO DEPTO", "CÓDIGO DISTRITO", "ARK", "CAF",
-                       "EVALUACION", "CAF intervec", "LXP"
+                       "EVALUACION", "CAF intervenc", "LXP", "KIRA", "CHK"
                       ];
 
 // --- Estado global ---------------------------------------------
