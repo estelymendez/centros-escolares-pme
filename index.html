@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Centros Escolares PME &mdash; Instrumento de Consulta</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-title">
+    <h1>Centros Escolares del PME</h1>
+    <p class="subtitle">Instrumento de consulta y visualización &mdash; MINED</p>
+  </div>
+  <div class="header-actions">
+    <span id="status-text" class="status-text">Cargando datos&hellip;</span>
+    <button id="refresh-btn" class="btn-refresh" title="Volver a consultar la fuente oficial">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+      Actualizar
+    </button>
+  </div>
+</header>
+
+<div class="app-body">
+
+  <aside class="panel panel-list">
+    <div class="filters">
+      <input id="search-input" type="search" placeholder="Buscar por nombre, código o dirección&hellip;" />
+      <div class="filter-row">
+        <select id="filter-depto"><option value="">Todos los departamentos</option></select>
+        <select id="filter-municipio"><option value="">Todos los municipios</option></select>
+      </div>
+      <div class="filter-row">
+        <select id="filter-zona"><option value="">Toda zona</option></select>
+        <select id="filter-sector"><option value="">Todo sector</option></select>
+      </div>
+      <div id="results-count" class="results-count">&nbsp;</div>
+    </div>
+    <div id="school-list" class="school-list"></div>
+  </aside>
+
+  <main class="panel panel-map">
+    <div id="map"></div>
+  </main>
+
+  <aside id="detail-panel" class="panel panel-detail hidden">
+    <button id="close-detail" class="close-detail" aria-label="Cerrar">&times;</button>
+    <div id="detail-content"></div>
+  </aside>
+
+</div>
+
+<footer class="app-footer">
+  Fuente oficial: listado de centros escolares del PME (Google Sheets) &middot;
+  <a href="https://docs.google.com/spreadsheets/d/1eGhVmPfOJcP57_LXYZZu4Z4TFWnrir8ow4zgbCSW_D4/edit?gid=1477083365" target="_blank" rel="noopener">ver hoja de origen</a>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
