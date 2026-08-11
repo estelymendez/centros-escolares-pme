@@ -61,6 +61,13 @@ const DETAIL_ORDER = [
 // Campos usados para la búsqueda de texto libre.
 const SEARCH_FIELDS = ["NOMBRE CE", "CÓD CE", "DIRECCION", "MUNICIPIO", "NOMBRE DEPTO"];
 
+// Columnas que NO deben mostrarse en el panel de detalle de cada centro
+// escolar. Agregue aquí, entre comillas y separado por comas, el nombre
+// EXACTO de la columna tal como aparece en la hoja de Google Sheets
+// (respetando mayúsculas y tildes). Ejemplo para ocultar dos columnas:
+// const HIDDEN_FIELDS = ["CÓDIGO DISTRITO", "acumulado"];
+const HIDDEN_FIELDS = [];
+
 // --- Estado global ---------------------------------------------
 let allSchools = [];
 let filteredSchools = [];
@@ -366,6 +373,7 @@ function showDetail(school) {
   const seen = new Set();
 
   DETAIL_ORDER.forEach((key) => {
+    if (HIDDEN_FIELDS.includes(key)) return;
     const val = school.fields[key];
     if (val) {
       rows.push([FIELD_LABELS[key] || key, val]);
@@ -375,6 +383,7 @@ function showDetail(school) {
   // Cualquier otro campo disponible en la hoja que no esté en el orden preferido.
   Object.keys(school.fields).forEach((key) => {
     if (seen.has(key)) return;
+    if (HIDDEN_FIELDS.includes(key)) return;
     const val = school.fields[key];
     if (!val) return;
     rows.push([FIELD_LABELS[key] || key, val]);
