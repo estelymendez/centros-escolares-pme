@@ -35,7 +35,7 @@ API. Por eso se puede publicar directamente como GitHub Pages.
 El instrumento consulta la hoja mediante su URL pública de exportación CSV:
 
 ```
-https://docs.google.com/spreadsheets/d/1eGhVmPfOJcP57_LXYZZu4Z4TFWnrir8ow4zgbCSW_D4/export?format=csv&gid=1477083365
+https://docs.google.com/spreadsheets/d/1eGhVmPfOJcP57_LXYZZu4Z4TFWnrir8ow4zgbCSW_D4/export?format=csv&gid=912175684
 ```
 
 Para que esto siga funcionando:
