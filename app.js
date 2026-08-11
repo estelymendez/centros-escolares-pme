@@ -5,7 +5,7 @@
 
 // --- Configuración de la fuente de datos ---------------------
 const SHEET_ID = "1eGhVmPfOJcP57_LXYZZu4Z4TFWnrir8ow4zgbCSW_D4";
-const SHEET_GID = "1477083365";
+const SHEET_GID = "912175684";
 // Exportación CSV pública de la hoja (permite fetch() desde cualquier
 // origen porque Google entrega encabezado CORS "*" en este endpoint).
 const DATA_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
@@ -15,13 +15,20 @@ const CACHE_KEY = "pme_centros_escolares_cache_v1";
 // se mostrarán en el panel de detalle). Cualquier columna que no esté
 // aquí pero tenga contenido en la hoja también se mostrará, con su
 // encabezado original como etiqueta.
+//
+// NOTA sobre columnas repetidas: esta hoja tiene dos columnas llamadas
+// "CÓD CE" y dos llamadas "ZONA" (Google Sheets lo permite, pero un mismo
+// nombre de columna repetido causaría que la segunda pisara a la primera).
+// Para evitar esa pérdida de datos, parseCsv() renombra automáticamente la
+// segunda aparición de cualquier encabezado repetido agregándole " (2)".
+// Por eso más abajo se hace referencia a "CÓD CE (2)" y "ZONA (2)".
 const FIELD_LABELS = {
   "CÓD CE": "Código de centro escolar",
+  "CÓD CE (2)": "Código de centro escolar (repetido en la hoja)",
   "NOMBRE CE": "Nombre del centro escolar",
   "DIRECCION": "Dirección",
   "TOTAL MATRICULA P": "Matrícula total",
   "mat 2026": "Matrícula 2026",
-  "acumulado": "Código acumulado / correlativo",
   "LATITUD": "Latitud",
   "LONGITUD": "Longitud",
   "CÓDIGO DEPTO": "Código de departamento",
@@ -30,32 +37,43 @@ const FIELD_LABELS = {
   "CÓDIGO DISTRITO": "Código de distrito",
   "NOMBRE DISTRITO": "Distrito",
   "PROPIEDAD": "Propiedad / propietario",
+  "ALQUILADA": "Sede alquilada",
   "TIPO DE SEDE": "Tipo de sede",
   "DESCRIPCION TIPO": "Descripción del tipo",
   "CLASIFICACION": "Clasificación",
+  "SUBVENCIONADA": "Subvencionada",
   "SECTOR": "Sector",
-  "ZONA": "Zona",
+  "ZONA": "Región",
+  "ZONA (2)": "Zona (urbana/rural)",
   "TURNO": "Turno",
+  "MODALIDAD": "Modalidad",
   "SECCIONES": "Secciones",
   "DOCENTES": "Docentes",
   "AULAS": "Aulas",
   "INTERVENCION": "Intervención",
-  "ESTATUS": "Estatus",
-  "Código": "Código (proyecto)",
-  "Escalada": "Escalada",
-  "Fase": "Fase",
-  "Grupo": "Grupo",
-  "Proveedor": "Proveedor",
+  "ESTATUS INTERVENCION": "Estatus de intervención",
+  "RED INTERNA": "Red interna",
+  "ESTATUS RED": "Estatus de la red",
+  "ELECTRICIDAD": "Electricidad",
+  "MOVISTAR": "Movistar",
+  "STARLINK": "Starlink",
+  "INAUGURACIONES": "Inauguraciones",
+  "ESCALADA": "Escalada",
+  "FASE": "Fase",
+  "GRUPO (BLOQUE)": "Grupo (bloque)",
+  "GRUPO2": "Grupo 2",
 };
 
 // Orden preferido de despliegue en el panel de detalle.
 const DETAIL_ORDER = [
   "NOMBRE CE", "CÓD CE", "DIRECCION", "NOMBRE DEPTO", "MUNICIPIO",
   "NOMBRE DISTRITO", "TOTAL MATRICULA P", "mat 2026", "SECCIONES",
-  "DOCENTES", "AULAS", "TURNO", "ZONA", "SECTOR", "CLASIFICACION",
-  "TIPO DE SEDE", "DESCRIPCION TIPO", "PROPIEDAD", "ESTATUS",
-  "INTERVENCION", "LATITUD", "LONGITUD", "Código", "Escalada", "Fase",
-  "Grupo", "Proveedor", "CÓDIGO DEPTO", "CÓDIGO DISTRITO", "acumulado",
+  "DOCENTES", "AULAS", "TURNO", "MODALIDAD", "ZONA (2)", "ZONA", "SECTOR",
+  "CLASIFICACION", "TIPO DE SEDE", "DESCRIPCION TIPO", "PROPIEDAD",
+  "ALQUILADA", "SUBVENCIONADA", "ESTATUS INTERVENCION", "INTERVENCION",
+  "RED INTERNA", "ESTATUS RED", "ELECTRICIDAD", "MOVISTAR", "STARLINK",
+  "INAUGURACIONES", "LATITUD", "LONGITUD", "ESCALADA", "FASE",
+  "GRUPO (BLOQUE)", "GRUPO2", "CÓDIGO DEPTO", "CÓDIGO DISTRITO",
 ];
 
 // Campos usados para la búsqueda de texto libre.
@@ -64,9 +82,10 @@ const SEARCH_FIELDS = ["NOMBRE CE", "CÓD CE", "DIRECCION", "MUNICIPIO", "NOMBRE
 // Columnas que NO deben mostrarse en el panel de detalle de cada centro
 // escolar. Agregue aquí, entre comillas y separado por comas, el nombre
 // EXACTO de la columna tal como aparece en la hoja de Google Sheets
-// (respetando mayúsculas y tildes). Ejemplo para ocultar dos columnas:
-// const HIDDEN_FIELDS = ["CÓDIGO DISTRITO", "acumulado"];
-const HIDDEN_FIELDS = [];
+// (respetando mayúsculas y tildes; si la columna está repetida en la hoja,
+// use el nombre con el sufijo " (2)" que agrega parseCsv()). Ejemplo:
+// const HIDDEN_FIELDS = ["CÓDIGO DISTRITO"];
+const HIDDEN_FIELDS = ["CÓD CE (2)"];
 
 // --- Estado global ---------------------------------------------
 let allSchools = [];
@@ -116,26 +135,55 @@ async function fetchSchoolData() {
 }
 
 function parseCsv(csvText) {
-  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-  const rows = parsed.data;
+  // Se parsea sin "header: true" porque esta hoja tiene encabezados
+  // repetidos (por ejemplo, dos columnas llamadas "CÓD CE" y dos llamadas
+  // "ZONA" con significados distintos). Con "header: true", Papa Parse
+  // crearía un objeto por fila usando el nombre de columna como llave, y la
+  // segunda columna repetida pisaría silenciosamente a la primera. Para
+  // evitarlo, se deduplican los encabezados a mano antes de armar los
+  // objetos: la primera aparición conserva su nombre y las siguientes se
+  // renombran agregando " (2)", " (3)", etc.
+  const parsed = Papa.parse(csvText, { header: false, skipEmptyLines: true });
+  const allRows = parsed.data;
+  if (!allRows.length) return [];
 
+  const rawHeaders = allRows[0].map((h) => (h ?? "").toString().trim());
+  const seenCount = {};
+  const headers = rawHeaders.map((h) => {
+    if (!h) return h;
+    seenCount[h] = (seenCount[h] || 0) + 1;
+    return seenCount[h] === 1 ? h : `${h} (${seenCount[h]})`;
+  });
+
+  const dataRows = allRows.slice(1);
   const schools = [];
-  rows.forEach((row, idx) => {
-    // Descarta columnas sin encabezado (celdas de relleno de la hoja) y recorta espacios.
+  dataRows.forEach((rowArr, idx) => {
     const clean = {};
-    Object.keys(row).forEach((key) => {
-      const cleanKey = key.trim();
-      if (!cleanKey) return;
-      const value = (row[key] ?? "").toString().trim();
-      clean[cleanKey] = value;
+    headers.forEach((key, colIdx) => {
+      if (!key) return; // columna sin encabezado
+      const value = (rowArr[colIdx] ?? "").toString().trim();
+      clean[key] = value;
     });
 
-    const codigo = clean["CÓD CE"] || clean["Código"];
+    const codigo = clean["CÓD CE"];
     const nombre = clean["NOMBRE CE"];
-    if (!codigo || !nombre) return; // fila vacía o incompleta
+    // Descarta filas vacías, incompletas, o basura residual de la hoja
+    // (por ejemplo, alguna fila de referencia/prueba cuyo "nombre" es solo
+    // un número, sin ninguna letra, lo cual nunca ocurre en un nombre real
+    // de centro escolar).
+    if (!codigo || !nombre) return;
+    if (!/[a-zA-ZÁÉÍÓÚÑÜáéíóúñü]/.test(nombre)) return;
 
-    const lat = parseFloat(clean["LATITUD"]);
-    const lon = parseFloat(clean["LONGITUD"]);
+    let lat = parseFloat(clean["LATITUD"]);
+    let lon = parseFloat(clean["LONGITUD"]);
+    // El Salvador está aproximadamente entre lat 13.0–14.6 y lon -90.3 a
+    // -87.5. Si una coordenada cae muy fuera de ese rango, probablemente es
+    // un error de captura en la hoja; se descarta la coordenada (el centro
+    // sigue apareciendo en el listado, solo no se grafica en el mapa).
+    if (!(lat >= 12.5 && lat <= 15) || !(lon >= -91 && lon <= -87)) {
+      lat = NaN;
+      lon = NaN;
+    }
 
     schools.push({
       id: `${codigo}-${idx}`,
@@ -226,7 +274,7 @@ function uniqueSorted(schools, fieldKey) {
 function populateFilterOptions(schools) {
   fillSelect(els.filterDepto, uniqueSorted(schools, "NOMBRE DEPTO"), "Todos los departamentos");
   fillSelect(els.filterMunicipio, uniqueSorted(schools, "MUNICIPIO"), "Todos los municipios");
-  fillSelect(els.filterZona, uniqueSorted(schools, "ZONA"), "Toda zona");
+  fillSelect(els.filterZona, uniqueSorted(schools, "ZONA (2)"), "Toda zona");
   fillSelect(els.filterSector, uniqueSorted(schools, "SECTOR"), "Todo sector");
 }
 
@@ -252,7 +300,7 @@ function applyFilters() {
   filteredSchools = allSchools.filter((s) => {
     if (depto && s.fields["NOMBRE DEPTO"] !== depto) return false;
     if (municipio && s.fields["MUNICIPIO"] !== municipio) return false;
-    if (zona && s.fields["ZONA"] !== zona) return false;
+    if (zona && s.fields["ZONA (2)"] !== zona) return false;
     if (sector && s.fields["SECTOR"] !== sector) return false;
     if (q) {
       const haystack = SEARCH_FIELDS.map((f) => (s.fields[f] || "")).join(" ").toLowerCase();
