@@ -288,8 +288,8 @@ function uniqueSorted(schools, fieldKey) {
 function populateFilterOptions(schools) {
   fillSelect(els.filterDepto, uniqueSorted(schools, "NOMBRE DEPTO"), "Todos los departamentos");
   fillSelect(els.filterDistrito, getDistritosForDepto(schools, ""), "Todos los distritos");
-  fillSelect(els.filterRegion, uniqueSorted(schools, "ZONA"), "Toda región");
-  fillSelect(els.filterGrupo, uniqueSorted(schools, "GRUPO (BLOQUE)"), "Todo grupo");
+  fillSelect(els.filterRegion, uniqueSorted(schools, "ZONA"), "Todas las regiones");
+  fillSelect(els.filterGrupo, uniqueSorted(schools, "GRUPO (BLOQUE)"), "Todos los grupos");
 }
 
 // Distritos que pertenecen a un departamento dado (o todos si no se indica
