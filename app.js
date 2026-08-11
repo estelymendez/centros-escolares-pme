@@ -61,6 +61,7 @@ const FIELD_LABELS = {
   "ESCALADA": "Escalada",
   "FASE": "Fase",
   "GRUPO (BLOQUE)": "Grupo",
+  "SUBGRUPO": "Subgrupo",
   "GRUPO2": "Grupo 2",
    "COORDENADAS": "Coordenadas",
 };
@@ -74,7 +75,7 @@ const DETAIL_ORDER = [
   "ALQUILADA", "SUBVENCIONADA", "ESTATUS INTERVENCION", "INTERVENCION",
   "RED INTERNA", "ESTATUS RED", "ELECTRICIDAD", "MOVISTAR", "STARLINK",
   "INAUGURACIONES", "LATITUD", "LONGITUD", "ESCALADA", "FASE",
-  "GRUPO (BLOQUE)", "GRUPO2", "CÓDIGO DEPTO", "CÓDIGO DISTRITO",
+  "GRUPO (BLOQUE)", "SUBGRUPO", "GRUPO2", "CÓDIGO DEPTO", "CÓDIGO DISTRITO",
 ];
 
 // Campos usados para la búsqueda de texto libre.
@@ -106,8 +107,10 @@ const els = {
   searchInput: document.getElementById("search-input"),
   filterDepto: document.getElementById("filter-depto"),
   filterMunicipio: document.getElementById("filter-municipio"),
+  filterDistrito: document.getElementById("filter-distrito"),
   filterZona: document.getElementById("filter-zona"),
-  filterSector: document.getElementById("filter-sector"),
+  filterRegion: document.getElementById("filter-region"),
+  filterGrupo: document.getElementById("filter-grupo"),
   resultsCount: document.getElementById("results-count"),
   schoolList: document.getElementById("school-list"),
   detailPanel: document.getElementById("detail-panel"),
@@ -189,6 +192,12 @@ function parseCsv(csvText) {
       lat = NaN;
       lon = NaN;
     }
+
+    // Si la hoja no tiene capturado el grupo/subgrupo de este centro, se
+    // rellena con un valor explícito en vez de dejarlo vacío, para que
+    // siempre aparezca en el panel de detalle y se pueda filtrar por él.
+    if (!clean["GRUPO (BLOQUE)"]) clean["GRUPO (BLOQUE)"] = "Sin grupo";
+    if (!clean["SUBGRUPO"]) clean["SUBGRUPO"] = "Sin subgrupo";
 
     schools.push({
       id: `${codigo}-${idx}`,
@@ -279,8 +288,26 @@ function uniqueSorted(schools, fieldKey) {
 function populateFilterOptions(schools) {
   fillSelect(els.filterDepto, uniqueSorted(schools, "NOMBRE DEPTO"), "Todos los departamentos");
   fillSelect(els.filterMunicipio, uniqueSorted(schools, "MUNICIPIO"), "Todos los municipios");
+  fillSelect(els.filterDistrito, getDistritosForDepto(schools, ""), "Todos los distritos");
   fillSelect(els.filterZona, uniqueSorted(schools, "ZONA (2)"), "Toda zona");
-  fillSelect(els.filterSector, uniqueSorted(schools, "SECTOR"), "Todo sector");
+  fillSelect(els.filterRegion, uniqueSorted(schools, "ZONA"), "Toda región");
+  fillSelect(els.filterGrupo, uniqueSorted(schools, "GRUPO (BLOQUE)"), "Todo grupo");
+}
+
+// Distritos que pertenecen a un departamento dado (o todos si no se indica
+// departamento). Usado para que el filtro de Distrito solo muestre las
+// opciones que tienen sentido según el Departamento seleccionado.
+function getDistritosForDepto(schools, depto) {
+  const scoped = depto ? schools.filter((s) => s.fields["NOMBRE DEPTO"] === depto) : schools;
+  return uniqueSorted(scoped, "NOMBRE DISTRITO");
+}
+
+// Departamento al que pertenece un distrito dado (los distritos son únicos
+// dentro de un solo departamento). Usado para autocompletar el filtro de
+// Departamento cuando se elige un Distrito directamente.
+function getDeptoForDistrito(schools, distrito) {
+  const match = schools.find((s) => s.fields["NOMBRE DISTRITO"] === distrito);
+  return match ? match.fields["NOMBRE DEPTO"] : "";
 }
 
 function fillSelect(selectEl, values, placeholder) {
@@ -299,14 +326,18 @@ function applyFilters() {
   const q = els.searchInput.value.trim().toLowerCase();
   const depto = els.filterDepto.value;
   const municipio = els.filterMunicipio.value;
+  const distrito = els.filterDistrito.value;
   const zona = els.filterZona.value;
-  const sector = els.filterSector.value;
+  const region = els.filterRegion.value;
+  const grupo = els.filterGrupo.value;
 
   filteredSchools = allSchools.filter((s) => {
     if (depto && s.fields["NOMBRE DEPTO"] !== depto) return false;
     if (municipio && s.fields["MUNICIPIO"] !== municipio) return false;
+    if (distrito && s.fields["NOMBRE DISTRITO"] !== distrito) return false;
     if (zona && s.fields["ZONA (2)"] !== zona) return false;
-    if (sector && s.fields["SECTOR"] !== sector) return false;
+    if (region && s.fields["ZONA"] !== region) return false;
+    if (grupo && s.fields["GRUPO (BLOQUE)"] !== grupo) return false;
     if (q) {
       const haystack = SEARCH_FIELDS.map((f) => (s.fields[f] || "")).join(" ").toLowerCase();
       if (!haystack.includes(q)) return false;
@@ -460,10 +491,31 @@ function showDetail(school) {
 function wireEvents() {
   els.refreshBtn.addEventListener("click", () => loadData(true));
   els.searchInput.addEventListener("input", debounce(applyFilters, 150));
-  els.filterDepto.addEventListener("change", applyFilters);
+
+  // Departamento y Distrito están enlazados en ambos sentidos: elegir un
+  // departamento limita la lista de distritos a los que pertenecen a él, y
+  // elegir un distrito selecciona automáticamente su departamento.
+  els.filterDepto.addEventListener("change", () => {
+    fillSelect(els.filterDistrito, getDistritosForDepto(allSchools, els.filterDepto.value), "Todos los distritos");
+    applyFilters();
+  });
+  els.filterDistrito.addEventListener("change", () => {
+    const distrito = els.filterDistrito.value;
+    if (distrito) {
+      const depto = getDeptoForDistrito(allSchools, distrito);
+      if (depto && els.filterDepto.value !== depto) {
+        els.filterDepto.value = depto;
+      }
+      fillSelect(els.filterDistrito, getDistritosForDepto(allSchools, els.filterDepto.value), "Todos los distritos");
+      els.filterDistrito.value = distrito;
+    }
+    applyFilters();
+  });
+
   els.filterMunicipio.addEventListener("change", applyFilters);
   els.filterZona.addEventListener("change", applyFilters);
-  els.filterSector.addEventListener("change", applyFilters);
+  els.filterRegion.addEventListener("change", applyFilters);
+  els.filterGrupo.addEventListener("change", applyFilters);
   els.closeDetail.addEventListener("click", () => els.detailPanel.classList.add("hidden"));
 }
 
