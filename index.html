@@ -38,8 +38,21 @@
       </div>
       <div class="filter-row">
         <select id="filter-region"><option value="">Todas las regiones</option></select>
-        <select id="filter-grupo"><option value="">Todos los grupos</option></select>
         <!-- <select id="filter-zona"><option value="">Toda zona</option></select> -->
+        <div class="multiselect" id="filter-grupo">
+          <button type="button" id="filter-grupo-toggle" class="multiselect-toggle">
+            <span id="filter-grupo-label">Todo grupo</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="filter-grupo-panel" class="multiselect-panel hidden">
+            <label class="multiselect-option multiselect-option-all">
+              <input type="checkbox" id="filter-grupo-all" checked />
+              <span>Todos</span>
+            </label>
+            <div class="multiselect-divider"></div>
+            <div id="filter-grupo-options"></div>
+          </div>
+        </div>
       </div>
       <div id="results-count" class="results-count">&nbsp;</div>
     </div>
