@@ -139,6 +139,72 @@ body {
   color: var(--gray-900);
 }
 
+/* Selector múltiple (usado por el filtro de Grupo: permite elegir una,
+   varias o todas las opciones mediante casillas de verificación). */
+.multiselect {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.multiselect-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--gray-900);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.multiselect-toggle:hover { border-color: var(--blue-500); }
+.multiselect-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multiselect-toggle svg { flex-shrink: 0; color: var(--gray-600); }
+
+.multiselect-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 1200;
+  min-width: 200px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  padding: 6px 0;
+}
+
+.multiselect-panel.hidden { display: none; }
+
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  color: var(--gray-900);
+  cursor: pointer;
+}
+
+.multiselect-option:hover { background: var(--blue-100); }
+.multiselect-option input { flex-shrink: 0; }
+.multiselect-option-all { font-weight: 600; }
+
+.multiselect-divider {
+  height: 1px;
+  background: var(--gray-300);
+  margin: 4px 0;
+}
+
 .results-count {
   font-size: 0.78rem;
   color: var(--gray-600);
