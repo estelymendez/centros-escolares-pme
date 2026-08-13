@@ -204,10 +204,13 @@ function parseCsv(csvText) {
       lon = NaN;
     }
 
-    // Si la hoja no tiene capturado el grupo/subgrupo de este centro, se
-    // rellena con un valor explícito en vez de dejarlo vacío, para que
-    // siempre aparezca en el panel de detalle y se pueda filtrar por él.
-    if (!clean["GRUPO (BLOQUE)"]) clean["GRUPO (BLOQUE)"] = "Sin grupo";
+    // Se excluyen del instrumento los centros que no tienen un grupo
+    // asignado en la hoja (no forman parte de ningún grupo de
+    // intervención/construcción). Si en el futuro se quiere volver a
+    // incluirlos, basta con cambiar este "return" por la línea de abajo,
+    // comentada, que los mostraría con la etiqueta "Sin grupo".
+    if (!clean["GRUPO (BLOQUE)"]) return;
+    // if (!clean["GRUPO (BLOQUE)"]) clean["GRUPO (BLOQUE)"] = "Sin grupo";
     if (!clean["SUBGRUPO"]) clean["SUBGRUPO"] = "Sin subgrupo";
 
     schools.push({
