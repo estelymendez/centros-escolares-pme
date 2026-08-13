@@ -100,6 +100,12 @@ let map, markerClusterGroup;
 let markersById = new Map();
 let activeSchoolId = null;
 
+// Selección del filtro de Grupo (multiselección). `null` significa "todo
+// grupo" (sin filtrar); un Set con valores concretos significa que el
+// usuario eligió una o varias opciones puntuales.
+let grupoValues = [];
+let selectedGrupos = null;
+
 // --- Elementos del DOM -------------------------------------------
 const els = {
   refreshBtn: document.getElementById("refresh-btn"),
@@ -110,7 +116,12 @@ const els = {
   filterDistrito: document.getElementById("filter-distrito"),
   //filterZona: document.getElementById("filter-zona"),
   filterRegion: document.getElementById("filter-region"),
-  filterGrupo: document.getElementById("filter-grupo"),
+  filterGrupoWrap: document.getElementById("filter-grupo"),
+  filterGrupoToggle: document.getElementById("filter-grupo-toggle"),
+  filterGrupoLabel: document.getElementById("filter-grupo-label"),
+  filterGrupoPanel: document.getElementById("filter-grupo-panel"),
+  filterGrupoAll: document.getElementById("filter-grupo-all"),
+  filterGrupoOptions: document.getElementById("filter-grupo-options"),
   resultsCount: document.getElementById("results-count"),
   schoolList: document.getElementById("school-list"),
   detailPanel: document.getElementById("detail-panel"),
@@ -288,8 +299,65 @@ function uniqueSorted(schools, fieldKey) {
 function populateFilterOptions(schools) {
   fillSelect(els.filterDepto, uniqueSorted(schools, "NOMBRE DEPTO"), "Todos los departamentos");
   fillSelect(els.filterDistrito, getDistritosForDepto(schools, ""), "Todos los distritos");
-  fillSelect(els.filterRegion, uniqueSorted(schools, "ZONA"), "Todas las regiones");
-  fillSelect(els.filterGrupo, uniqueSorted(schools, "GRUPO (BLOQUE)"), "Todos los grupos");
+  fillSelect(els.filterRegion, uniqueSorted(schools, "ZONA"), "Toda región");
+
+  const newGrupoValues = uniqueSorted(schools, "GRUPO (BLOQUE)");
+  // Si había una selección puntual (no "todos"), se conserva quitando los
+  // valores que ya no existan al refrescar los datos. Si estaba en "todos",
+  // se queda en "todos" (incluye automáticamente cualquier grupo nuevo).
+  if (selectedGrupos !== null) {
+    const kept = new Set(Array.from(selectedGrupos).filter((v) => newGrupoValues.includes(v)));
+    selectedGrupos = kept.size > 0 ? kept : null;
+  }
+  grupoValues = newGrupoValues;
+  renderGrupoOptions();
+}
+
+// ------------------------------------------------------------------
+// Filtro de Grupo (selector múltiple: una, varias o todas las opciones)
+// ------------------------------------------------------------------
+function renderGrupoOptions() {
+  els.filterGrupoOptions.innerHTML = "";
+  grupoValues.forEach((v) => {
+    const checked = selectedGrupos === null || selectedGrupos.has(v);
+    const label = document.createElement("label");
+    label.className = "multiselect-option";
+    label.innerHTML = `<input type="checkbox" value="${escapeHtml(v)}" ${checked ? "checked" : ""}><span>${escapeHtml(v)}</span>`;
+    label.querySelector("input").addEventListener("change", (e) => onGrupoOptionToggle(v, e.target.checked));
+    els.filterGrupoOptions.appendChild(label);
+  });
+  updateGrupoAllCheckbox();
+  updateGrupoLabel();
+}
+
+function onGrupoOptionToggle(value, checked) {
+  // Si venía de "todos" (null), se convierte en un conjunto explícito con
+  // todos los valores actuales antes de aplicar el cambio puntual.
+  if (selectedGrupos === null) selectedGrupos = new Set(grupoValues);
+  if (checked) selectedGrupos.add(value);
+  else selectedGrupos.delete(value);
+  if (selectedGrupos.size === grupoValues.length) selectedGrupos = null; // vuelve a "todos"
+  updateGrupoAllCheckbox();
+  updateGrupoLabel();
+  applyFilters();
+}
+
+function updateGrupoAllCheckbox() {
+  const allSelected = selectedGrupos === null;
+  els.filterGrupoAll.checked = allSelected;
+  els.filterGrupoAll.indeterminate = !allSelected && selectedGrupos.size > 0;
+}
+
+function updateGrupoLabel() {
+  if (selectedGrupos === null) {
+    els.filterGrupoLabel.textContent = "Todo grupo";
+  } else if (selectedGrupos.size === 0) {
+    els.filterGrupoLabel.textContent = "Ningún grupo";
+  } else if (selectedGrupos.size === 1) {
+    els.filterGrupoLabel.textContent = Array.from(selectedGrupos)[0];
+  } else {
+    els.filterGrupoLabel.textContent = `${selectedGrupos.size} grupos seleccionados`;
+  }
 }
 
 // Distritos que pertenecen a un departamento dado (o todos si no se indica
@@ -325,13 +393,12 @@ function applyFilters() {
   const depto = els.filterDepto.value;
   const distrito = els.filterDistrito.value;
   const region = els.filterRegion.value;
-  const grupo = els.filterGrupo.value;
 
   filteredSchools = allSchools.filter((s) => {
     if (depto && s.fields["NOMBRE DEPTO"] !== depto) return false;
     if (distrito && s.fields["NOMBRE DISTRITO"] !== distrito) return false;
     if (region && s.fields["ZONA"] !== region) return false;
-    if (grupo && s.fields["GRUPO (BLOQUE)"] !== grupo) return false;
+    if (selectedGrupos !== null && !selectedGrupos.has(s.fields["GRUPO (BLOQUE)"])) return false;
     if (q) {
       const haystack = SEARCH_FIELDS.map((f) => (s.fields[f] || "")).join(" ").toLowerCase();
       if (!haystack.includes(q)) return false;
@@ -507,7 +574,24 @@ function wireEvents() {
   });
 
   els.filterRegion.addEventListener("change", applyFilters);
-  els.filterGrupo.addEventListener("change", applyFilters);
+
+  // Filtro de Grupo (selector múltiple): el botón abre/cierra el panel de
+  // casillas, y la casilla "Todos" alterna entre seleccionar y limpiar todo.
+  els.filterGrupoToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    els.filterGrupoPanel.classList.toggle("hidden");
+  });
+  els.filterGrupoAll.addEventListener("change", () => {
+    selectedGrupos = els.filterGrupoAll.checked ? null : new Set();
+    renderGrupoOptions();
+    applyFilters();
+  });
+  document.addEventListener("click", (e) => {
+    if (!els.filterGrupoPanel.classList.contains("hidden") && !e.target.closest("#filter-grupo")) {
+      els.filterGrupoPanel.classList.add("hidden");
+    }
+  });
+
   els.closeDetail.addEventListener("click", () => els.detailPanel.classList.add("hidden"));
 }
 
