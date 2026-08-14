@@ -205,6 +205,28 @@ body {
   margin: 4px 0;
 }
 
+.export-row {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-export {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--blue-500);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--blue-700);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-export:hover { background: var(--blue-100); }
+.btn-export:disabled { opacity: 0.6; cursor: default; }
+
 .results-count {
   font-size: 0.78rem;
   color: var(--gray-600);
