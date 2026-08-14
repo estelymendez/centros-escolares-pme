@@ -32,13 +32,50 @@
     <div class="filters">
       <input id="search-input" type="search" placeholder="Buscar por nombre, código o dirección&hellip;" />
       <div class="filter-row">
-        <select id="filter-depto"><option value="">Todos los departamentos</option></select>
-        <!-- <select id="filter-municipio"><option value="">Todos los municipios</option></select> -->
-        <select id="filter-distrito"><option value="">Todos los distritos</option></select>
+        <div class="multiselect" id="filter-depto">
+          <button type="button" id="filter-depto-toggle" class="multiselect-toggle">
+            <span id="filter-depto-label">Todos los departamentos</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="filter-depto-panel" class="multiselect-panel hidden">
+            <label class="multiselect-option multiselect-option-all">
+              <input type="checkbox" id="filter-depto-all" checked />
+              <span>Todos</span>
+            </label>
+            <div class="multiselect-divider"></div>
+            <div id="filter-depto-options"></div>
+          </div>
+        </div>
+        <div class="multiselect" id="filter-distrito">
+          <button type="button" id="filter-distrito-toggle" class="multiselect-toggle">
+            <span id="filter-distrito-label">Todos los distritos</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="filter-distrito-panel" class="multiselect-panel hidden">
+            <label class="multiselect-option multiselect-option-all">
+              <input type="checkbox" id="filter-distrito-all" checked />
+              <span>Todos</span>
+            </label>
+            <div class="multiselect-divider"></div>
+            <div id="filter-distrito-options"></div>
+          </div>
+        </div>
       </div>
       <div class="filter-row">
-        <select id="filter-region"><option value="">Todas las regiones</option></select>
-        <!-- <select id="filter-zona"><option value="">Toda zona</option></select> -->
+        <div class="multiselect" id="filter-region">
+          <button type="button" id="filter-region-toggle" class="multiselect-toggle">
+            <span id="filter-region-label">Todas las regiones</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="filter-region-panel" class="multiselect-panel hidden">
+            <label class="multiselect-option multiselect-option-all">
+              <input type="checkbox" id="filter-region-all" checked />
+              <span>Todos</span>
+            </label>
+            <div class="multiselect-divider"></div>
+            <div id="filter-region-options"></div>
+          </div>
+        </div>
         <div class="multiselect" id="filter-grupo">
           <button type="button" id="filter-grupo-toggle" class="multiselect-toggle">
             <span id="filter-grupo-label">Todo grupo</span>
@@ -51,6 +88,22 @@
             </label>
             <div class="multiselect-divider"></div>
             <div id="filter-grupo-options"></div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-row">
+        <div class="multiselect" id="filter-fase">
+          <button type="button" id="filter-fase-toggle" class="multiselect-toggle">
+            <span id="filter-fase-label">Toda fase</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="filter-fase-panel" class="multiselect-panel hidden">
+            <label class="multiselect-option multiselect-option-all">
+              <input type="checkbox" id="filter-fase-all" checked />
+              <span>Todos</span>
+            </label>
+            <div class="multiselect-divider"></div>
+            <div id="filter-fase-options"></div>
           </div>
         </div>
       </div>

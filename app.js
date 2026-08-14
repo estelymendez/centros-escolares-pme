@@ -100,28 +100,31 @@ let map, markerClusterGroup;
 let markersById = new Map();
 let activeSchoolId = null;
 
-// Selección del filtro de Grupo (multiselección). `null` significa "todo
-// grupo" (sin filtrar); un Set con valores concretos significa que el
-// usuario eligió una o varias opciones puntuales.
-let grupoValues = [];
-let selectedGrupos = null;
+// Definición de los filtros de selección múltiple (Departamento, Distrito,
+// Región, Grupo y Fase). Cada uno permite elegir una, varias o todas las
+// opciones mediante casillas de verificación. `sort` es opcional; si no se
+// indica, se usa el orden alfabético normal (localeCompare en español). El
+// filtro de Grupo usa `naturalCompare` para que "B10" no quede antes que
+// "B2" (orden natural/numérico: B1, B2, ..., B9, B10, B11, ..., B16).
+const FILTER_DEFS = [
+  { name: "depto", fieldKey: "NOMBRE DEPTO", baseId: "filter-depto", allLabel: "Todos los departamentos", noneLabel: "Ningún departamento" },
+  { name: "distrito", fieldKey: "NOMBRE DISTRITO", baseId: "filter-distrito", allLabel: "Todos los distritos", noneLabel: "Ningún distrito" },
+  { name: "region", fieldKey: "ZONA", baseId: "filter-region", allLabel: "Todas las regiones", noneLabel: "Ninguna región" },
+  { name: "grupo", fieldKey: "GRUPO (BLOQUE)", baseId: "filter-grupo", allLabel: "Todo grupo", noneLabel: "Ningún grupo", sort: naturalCompare },
+  { name: "fase", fieldKey: "FASE", baseId: "filter-fase", allLabel: "Toda fase", noneLabel: "Ninguna fase" },
+];
+
+// Se llena en initMultiselects(): filters["depto"], filters["distrito"], etc.
+// Cada entrada tiene forma { def, values: [...], selected: null|Set, els: {...} }.
+// `selected === null` significa "todos" (sin filtrar); un Set con valores
+// concretos significa que el usuario eligió una o varias opciones puntuales.
+let filters = {};
 
 // --- Elementos del DOM -------------------------------------------
 const els = {
   refreshBtn: document.getElementById("refresh-btn"),
   statusText: document.getElementById("status-text"),
   searchInput: document.getElementById("search-input"),
-  filterDepto: document.getElementById("filter-depto"),
-  //filterMunicipio: document.getElementById("filter-municipio"),
-  filterDistrito: document.getElementById("filter-distrito"),
-  //filterZona: document.getElementById("filter-zona"),
-  filterRegion: document.getElementById("filter-region"),
-  filterGrupoWrap: document.getElementById("filter-grupo"),
-  filterGrupoToggle: document.getElementById("filter-grupo-toggle"),
-  filterGrupoLabel: document.getElementById("filter-grupo-label"),
-  filterGrupoPanel: document.getElementById("filter-grupo-panel"),
-  filterGrupoAll: document.getElementById("filter-grupo-all"),
-  filterGrupoOptions: document.getElementById("filter-grupo-options"),
   exportFilteredBtn: document.getElementById("export-filtered-btn"),
   exportAllBtn: document.getElementById("export-all-btn"),
   resultsCount: document.getElementById("results-count"),
@@ -292,118 +295,184 @@ function setLoading(loading, isManualRefresh) {
 // ------------------------------------------------------------------
 // Filtros
 // ------------------------------------------------------------------
-function uniqueSorted(schools, fieldKey) {
+
+// Comparador "natural": separa cada valor en tramos de dígitos y de texto,
+// y compara los tramos numéricos como números en vez de como texto. Así
+// "B10" queda después de "B9" en vez de entre "B1" y "B2" (que es lo que
+// pasaría con un orden alfabético normal). Se usa para el filtro de Grupo:
+// B1, B2, B3, ..., B9, B10, B11, ..., B16.
+function naturalCompare(a, b) {
+  const re = /(\d+)|(\D+)/g;
+  const ax = String(a).match(re) || [];
+  const bx = String(b).match(re) || [];
+  const len = Math.max(ax.length, bx.length);
+  for (let i = 0; i < len; i++) {
+    const av = ax[i] ?? "";
+    const bv = bx[i] ?? "";
+    const an = /^\d+$/.test(av);
+    const bn = /^\d+$/.test(bv);
+    if (an && bn) {
+      const diff = parseInt(av, 10) - parseInt(bv, 10);
+      if (diff !== 0) return diff;
+    } else {
+      const cmp = av.localeCompare(bv, "es");
+      if (cmp !== 0) return cmp;
+    }
+  }
+  return 0;
+}
+
+function uniqueSorted(schools, fieldKey, compareFn) {
   const set = new Set();
   schools.forEach((s) => {
     const v = s.fields[fieldKey];
     if (v) set.add(v);
   });
-  return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
-}
-
-function populateFilterOptions(schools) {
-  fillSelect(els.filterDepto, uniqueSorted(schools, "NOMBRE DEPTO"), "Todos los departamentos");
-  fillSelect(els.filterDistrito, getDistritosForDepto(schools, ""), "Todos los distritos");
-  fillSelect(els.filterRegion, uniqueSorted(schools, "ZONA"), "Toda región");
-
-  const newGrupoValues = uniqueSorted(schools, "GRUPO (BLOQUE)");
-  // Si había una selección puntual (no "todos"), se conserva quitando los
-  // valores que ya no existan al refrescar los datos. Si estaba en "todos",
-  // se queda en "todos" (incluye automáticamente cualquier grupo nuevo).
-  if (selectedGrupos !== null) {
-    const kept = new Set(Array.from(selectedGrupos).filter((v) => newGrupoValues.includes(v)));
-    selectedGrupos = kept.size > 0 ? kept : null;
-  }
-  grupoValues = newGrupoValues;
-  renderGrupoOptions();
+  return Array.from(set).sort(compareFn || ((a, b) => a.localeCompare(b, "es")));
 }
 
 // ------------------------------------------------------------------
-// Filtro de Grupo (selector múltiple: una, varias o todas las opciones)
+// Filtros de selección múltiple (una, varias o todas las opciones)
 // ------------------------------------------------------------------
-function renderGrupoOptions() {
-  els.filterGrupoOptions.innerHTML = "";
-  grupoValues.forEach((v) => {
-    const checked = selectedGrupos === null || selectedGrupos.has(v);
+
+// Crea el estado y conecta los eventos de los cinco filtros (Departamento,
+// Distrito, Región, Grupo y Fase). Se llama una sola vez, al arrancar.
+function initMultiselects() {
+  filters = {};
+  FILTER_DEFS.forEach((def) => {
+    const filterEls = {
+      toggle: document.getElementById(`${def.baseId}-toggle`),
+      label: document.getElementById(`${def.baseId}-label`),
+      panel: document.getElementById(`${def.baseId}-panel`),
+      all: document.getElementById(`${def.baseId}-all`),
+      options: document.getElementById(`${def.baseId}-options`),
+    };
+    const f = { def, values: [], selected: null, els: filterEls };
+    filters[def.name] = f;
+
+    filterEls.toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      filterEls.panel.classList.toggle("hidden");
+    });
+    filterEls.all.addEventListener("change", () => {
+      f.selected = filterEls.all.checked ? null : new Set();
+      renderMultiselectOptions(f);
+      onFilterChanged(f);
+    });
+  });
+
+  // Cierra cualquier panel abierto al hacer clic fuera de él.
+  document.addEventListener("click", (e) => {
+    Object.values(filters).forEach((f) => {
+      if (!f.els.panel.classList.contains("hidden") && !e.target.closest(`#${f.def.baseId}`)) {
+        f.els.panel.classList.add("hidden");
+      }
+    });
+  });
+}
+
+function renderMultiselectOptions(f) {
+  f.els.options.innerHTML = "";
+  f.values.forEach((v) => {
+    const checked = f.selected === null || f.selected.has(v);
     const label = document.createElement("label");
     label.className = "multiselect-option";
     label.innerHTML = `<input type="checkbox" value="${escapeHtml(v)}" ${checked ? "checked" : ""}><span>${escapeHtml(v)}</span>`;
-    label.querySelector("input").addEventListener("change", (e) => onGrupoOptionToggle(v, e.target.checked));
-    els.filterGrupoOptions.appendChild(label);
+    label.querySelector("input").addEventListener("change", (e) => onOptionToggle(f, v, e.target.checked));
+    f.els.options.appendChild(label);
   });
-  updateGrupoAllCheckbox();
-  updateGrupoLabel();
+  updateAllCheckbox(f);
+  updateFilterLabel(f);
 }
 
-function onGrupoOptionToggle(value, checked) {
+function onOptionToggle(f, value, checked) {
   // Si venía de "todos" (null), se convierte en un conjunto explícito con
   // todos los valores actuales antes de aplicar el cambio puntual.
-  if (selectedGrupos === null) selectedGrupos = new Set(grupoValues);
-  if (checked) selectedGrupos.add(value);
-  else selectedGrupos.delete(value);
-  if (selectedGrupos.size === grupoValues.length) selectedGrupos = null; // vuelve a "todos"
-  updateGrupoAllCheckbox();
-  updateGrupoLabel();
-  applyFilters();
+  if (f.selected === null) f.selected = new Set(f.values);
+  if (checked) f.selected.add(value);
+  else f.selected.delete(value);
+  if (f.selected.size === f.values.length) f.selected = null; // vuelve a "todos"
+  updateAllCheckbox(f);
+  updateFilterLabel(f);
+  onFilterChanged(f);
 }
 
-function updateGrupoAllCheckbox() {
-  const allSelected = selectedGrupos === null;
-  els.filterGrupoAll.checked = allSelected;
-  els.filterGrupoAll.indeterminate = !allSelected && selectedGrupos.size > 0;
+function updateAllCheckbox(f) {
+  const allSelected = f.selected === null;
+  f.els.all.checked = allSelected;
+  f.els.all.indeterminate = !allSelected && f.selected.size > 0;
 }
 
-function updateGrupoLabel() {
-  if (selectedGrupos === null) {
-    els.filterGrupoLabel.textContent = "Todo grupo";
-  } else if (selectedGrupos.size === 0) {
-    els.filterGrupoLabel.textContent = "Ningún grupo";
-  } else if (selectedGrupos.size === 1) {
-    els.filterGrupoLabel.textContent = Array.from(selectedGrupos)[0];
+function updateFilterLabel(f) {
+  if (f.selected === null) {
+    f.els.label.textContent = f.def.allLabel;
+  } else if (f.selected.size === 0) {
+    f.els.label.textContent = f.def.noneLabel;
+  } else if (f.selected.size === 1) {
+    f.els.label.textContent = Array.from(f.selected)[0];
   } else {
-    els.filterGrupoLabel.textContent = `${selectedGrupos.size} grupos seleccionados`;
+    f.els.label.textContent = `${f.selected.size} seleccionados`;
   }
 }
 
-// Distritos que pertenecen a un departamento dado (o todos si no se indica
-// departamento). Usado para que el filtro de Distrito solo muestre las
-// opciones que tienen sentido según el Departamento seleccionado.
-function getDistritosForDepto(schools, depto) {
-  const scoped = depto ? schools.filter((s) => s.fields["NOMBRE DEPTO"] === depto) : schools;
-  return uniqueSorted(scoped, "NOMBRE DISTRITO");
+// Reemplaza la lista de opciones disponibles de un filtro (por ejemplo, al
+// cargar datos nuevos, o al re-acotar Distrito según el Departamento
+// elegido). Si había una selección puntual (no "todos"), se conserva
+// quitando los valores que ya no existan; si con eso no queda ninguno, se
+// vuelve a "todos" (igual que se hacía antes solo para Grupo).
+function setFilterValues(f, newValues) {
+  if (f.selected !== null) {
+    const kept = new Set(Array.from(f.selected).filter((v) => newValues.includes(v)));
+    f.selected = kept.size > 0 ? kept : null;
+  }
+  f.values = newValues;
+  renderMultiselectOptions(f);
 }
 
-// Departamento al que pertenece un distrito dado (los distritos son únicos
-// dentro de un solo departamento). Usado para autocompletar el filtro de
-// Departamento cuando se elige un Distrito directamente.
-function getDeptoForDistrito(schools, distrito) {
-  const match = schools.find((s) => s.fields["NOMBRE DISTRITO"] === distrito);
-  return match ? match.fields["NOMBRE DEPTO"] : "";
+function matchesFilter(f, value) {
+  if (f.selected === null) return true;
+  return f.selected.has(value);
 }
 
-function fillSelect(selectEl, values, placeholder) {
-  const current = selectEl.value;
-  selectEl.innerHTML = `<option value="">${placeholder}</option>`;
-  values.forEach((v) => {
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = v;
-    selectEl.appendChild(opt);
-  });
-  if (values.includes(current)) selectEl.value = current;
+function onFilterChanged(f) {
+  // Departamento y Distrito están enlazados en un solo sentido: elegir uno o
+  // varios departamentos acota las opciones de Distrito a las que
+  // pertenecen a esos departamentos. (No se hace al revés porque, al
+  // permitir selección múltiple en ambos filtros, "autoseleccionar" el
+  // departamento correspondiente a cada distrito elegido dejaría de tener
+  // un resultado único y sería confuso).
+  if (f.def.name === "depto") {
+    updateDistritoOptionsForDepto();
+  }
+  applyFilters();
+}
+
+function updateDistritoOptionsForDepto() {
+  const deptoFilter = filters.depto;
+  const distritoFilter = filters.distrito;
+  const scoped = deptoFilter.selected === null
+    ? allSchools
+    : allSchools.filter((s) => deptoFilter.selected.has(s.fields["NOMBRE DEPTO"]));
+  setFilterValues(distritoFilter, uniqueSorted(scoped, "NOMBRE DISTRITO"));
+}
+
+function populateFilterOptions(schools) {
+  setFilterValues(filters.depto, uniqueSorted(schools, "NOMBRE DEPTO"));
+  updateDistritoOptionsForDepto();
+  setFilterValues(filters.region, uniqueSorted(schools, "ZONA"));
+  setFilterValues(filters.grupo, uniqueSorted(schools, "GRUPO (BLOQUE)", naturalCompare));
+  setFilterValues(filters.fase, uniqueSorted(schools, "FASE"));
 }
 
 function applyFilters() {
   const q = els.searchInput.value.trim().toLowerCase();
-  const depto = els.filterDepto.value;
-  const distrito = els.filterDistrito.value;
-  const region = els.filterRegion.value;
 
   filteredSchools = allSchools.filter((s) => {
-    if (depto && s.fields["NOMBRE DEPTO"] !== depto) return false;
-    if (distrito && s.fields["NOMBRE DISTRITO"] !== distrito) return false;
-    if (region && s.fields["ZONA"] !== region) return false;
-    if (selectedGrupos !== null && !selectedGrupos.has(s.fields["GRUPO (BLOQUE)"])) return false;
+    if (!matchesFilter(filters.depto, s.fields["NOMBRE DEPTO"])) return false;
+    if (!matchesFilter(filters.distrito, s.fields["NOMBRE DISTRITO"])) return false;
+    if (!matchesFilter(filters.region, s.fields["ZONA"])) return false;
+    if (!matchesFilter(filters.grupo, s.fields["GRUPO (BLOQUE)"])) return false;
+    if (!matchesFilter(filters.fase, s.fields["FASE"])) return false;
     if (q) {
       const haystack = SEARCH_FIELDS.map((f) => (s.fields[f] || "")).join(" ").toLowerCase();
       if (!haystack.includes(q)) return false;
@@ -620,47 +689,10 @@ function showDetail(school) {
 // Eventos
 // ------------------------------------------------------------------
 function wireEvents() {
+  initMultiselects();
+
   els.refreshBtn.addEventListener("click", () => loadData(true));
   els.searchInput.addEventListener("input", debounce(applyFilters, 150));
-
-  // Departamento y Distrito están enlazados en ambos sentidos: elegir un
-  // departamento limita la lista de distritos a los que pertenecen a él, y
-  // elegir un distrito selecciona automáticamente su departamento.
-  els.filterDepto.addEventListener("change", () => {
-    fillSelect(els.filterDistrito, getDistritosForDepto(allSchools, els.filterDepto.value), "Todos los distritos");
-    applyFilters();
-  });
-  els.filterDistrito.addEventListener("change", () => {
-    const distrito = els.filterDistrito.value;
-    if (distrito) {
-      const depto = getDeptoForDistrito(allSchools, distrito);
-      if (depto && els.filterDepto.value !== depto) {
-        els.filterDepto.value = depto;
-      }
-      fillSelect(els.filterDistrito, getDistritosForDepto(allSchools, els.filterDepto.value), "Todos los distritos");
-      els.filterDistrito.value = distrito;
-    }
-    applyFilters();
-  });
-
-  els.filterRegion.addEventListener("change", applyFilters);
-
-  // Filtro de Grupo (selector múltiple): el botón abre/cierra el panel de
-  // casillas, y la casilla "Todos" alterna entre seleccionar y limpiar todo.
-  els.filterGrupoToggle.addEventListener("click", (e) => {
-    e.stopPropagation();
-    els.filterGrupoPanel.classList.toggle("hidden");
-  });
-  els.filterGrupoAll.addEventListener("change", () => {
-    selectedGrupos = els.filterGrupoAll.checked ? null : new Set();
-    renderGrupoOptions();
-    applyFilters();
-  });
-  document.addEventListener("click", (e) => {
-    if (!els.filterGrupoPanel.classList.contains("hidden") && !e.target.closest("#filter-grupo")) {
-      els.filterGrupoPanel.classList.add("hidden");
-    }
-  });
 
   els.closeDetail.addEventListener("click", () => els.detailPanel.classList.add("hidden"));
 
