@@ -122,6 +122,8 @@ const els = {
   filterGrupoPanel: document.getElementById("filter-grupo-panel"),
   filterGrupoAll: document.getElementById("filter-grupo-all"),
   filterGrupoOptions: document.getElementById("filter-grupo-options"),
+  exportFilteredBtn: document.getElementById("export-filtered-btn"),
+  exportAllBtn: document.getElementById("export-all-btn"),
   resultsCount: document.getElementById("results-count"),
   schoolList: document.getElementById("school-list"),
   detailPanel: document.getElementById("detail-panel"),
@@ -415,6 +417,71 @@ function applyFilters() {
 }
 
 // ------------------------------------------------------------------
+// Exportar a Excel
+// ------------------------------------------------------------------
+// Columnas a incluir en el archivo exportado: las mismas que se ven en el
+// panel de detalle (DETAIL_ORDER, sin las que están en HIDDEN_FIELDS), más
+// cualquier otra columna de la hoja que no esté oculta explícitamente
+// (para no dejar fuera algo nuevo que aparezca en la fuente oficial).
+function getExportColumns() {
+  const cols = [];
+  const seen = new Set();
+  DETAIL_ORDER.forEach((key) => {
+    if (HIDDEN_FIELDS.includes(key)) return;
+    cols.push(key);
+    seen.add(key);
+  });
+  const extra = new Set();
+  allSchools.forEach((s) => {
+    Object.keys(s.fields).forEach((key) => {
+      if (!seen.has(key) && !HIDDEN_FIELDS.includes(key)) extra.add(key);
+    });
+  });
+  cols.push(...Array.from(extra).sort((a, b) => a.localeCompare(b, "es")));
+  return cols;
+}
+
+function exportToExcel(schools, filename) {
+  if (!schools.length) {
+    alert("No hay centros escolares para exportar con los filtros actuales.");
+    return;
+  }
+  // Si la librería que arma el archivo Excel (SheetJS, cargada desde un
+  // CDN en index.html) no llegó a cargar -por ejemplo, por una conexión
+  // lenta, un bloqueador de contenido, o porque falta la línea <script>
+  // correspondiente en index.html- antes esto fallaba en silencio (no
+  // pasaba nada visible). Ahora se avisa explícitamente en pantalla.
+  if (typeof XLSX === "undefined") {
+    alert(
+      "No se pudo generar el Excel porque no cargó la librería necesaria (SheetJS).\n\n" +
+      "Revisa tu conexión a internet y recarga la página. Si el problema persiste, " +
+      "confirma que index.html incluya la línea:\n" +
+      '<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>\n' +
+      "justo antes de <script src=\"app.js\"></script>."
+    );
+    return;
+  }
+  try {
+    const cols = getExportColumns();
+    const header = cols.map((key) => FIELD_LABELS[key] || key);
+    const rows = schools.map((s) => cols.map((key) => s.fields[key] || ""));
+    const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Centros escolares");
+    XLSX.writeFile(workbook, filename);
+  } catch (err) {
+    console.error(err);
+    alert(`No se pudo generar el Excel: ${err.message}`);
+  }
+}
+
+function dateStamp() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+}
+
+// ------------------------------------------------------------------
 // Listado
 // ------------------------------------------------------------------
 const LIST_RENDER_LIMIT = 400; // por rendimiento, se pagina la lista visual
@@ -596,6 +663,13 @@ function wireEvents() {
   });
 
   els.closeDetail.addEventListener("click", () => els.detailPanel.classList.add("hidden"));
+
+  els.exportFilteredBtn.addEventListener("click", () => {
+    exportToExcel(filteredSchools, `centros_escolares_filtrado_${dateStamp()}.xlsx`);
+  });
+  els.exportAllBtn.addEventListener("click", () => {
+    exportToExcel(allSchools, `centros_escolares_completo_${dateStamp()}.xlsx`);
+  });
 }
 
 function debounce(fn, wait) {
